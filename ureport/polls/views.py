@@ -249,6 +249,7 @@ class PollCRUDL(SmartCRUDL):
             # for each ruleset
             for ruleset in rulesets:
                 r_uuid = ruleset['uuid']
+                r_response_type = ruleset['response_type']
 
                 included = data.get('ruleset_%s_include' % r_uuid, False)
                 title = data['ruleset_%s_title' % r_uuid]
@@ -257,12 +258,13 @@ class PollCRUDL(SmartCRUDL):
                 if included:
                     # already one of our questions, just update our title
                     if existing:
+                        existing.response_type = r_response_type
                         existing.title = title
                         existing.save()
 
                     # doesn't exist, let's add it
                     else:
-                        poll.questions.create(ruleset_uuid=r_uuid, title=title,
+                        poll.questions.create(ruleset_uuid=r_uuid, title=title, response_type=r_response_type,
                                               created_by=self.request.user, modified_by=self.request.user)
 
                 # not included, remove it from our poll

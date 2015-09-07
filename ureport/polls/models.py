@@ -308,6 +308,8 @@ class PollQuestion(SmartModel):
                              help_text=_("The title of this question"))
     ruleset_uuid = models.CharField(max_length=36, help_text=_("The RuleSet this question is based on"))
 
+    response_type = models.CharField(max_length=1, null=True, help_text=_("The response type for this question"))
+
     def fetch_results(self, segment=None):
         from raven.contrib.django.raven_compat.models import client
 
@@ -361,14 +363,7 @@ class PollQuestion(SmartModel):
         return dict()
 
     def is_open_ended(self):
-        cache_key = 'open_ended:%d' % self.id
-        open_ended = cache.get(cache_key, None)
-
-        if open_ended is None:
-            open_ended = self.get_total_summary_data().get('open_ended', False)
-            cache.set(cache_key, open_ended, OPEN_ENDED_CACHE_TIME)
-
-        return open_ended
+        return self.response_type == 'O'
 
     def get_responded(self):
         return self.get_total_summary_data().get('set', '---')

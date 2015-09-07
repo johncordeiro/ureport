@@ -987,6 +987,7 @@ class PollQuestionTest(DashTest):
         poll_question1 = PollQuestion.objects.create(poll=poll1,
                                                      title="question 1",
                                                      ruleset_uuid="uuid-101",
+                                                     response_type='C',
                                                      created_by=self.admin,
                                                      modified_by=self.admin)
 
@@ -994,6 +995,13 @@ class PollQuestionTest(DashTest):
         fetched_results = [dict(open_ended=False, set=3462, unset=3694, categories=[dict(count=2210, label='Yes'),
                                                                                     dict(count=1252, label='No')],
                                     label='All')]
+
+        self.assertFalse(poll_question1.is_open_ended())
+
+        poll_question1.response_type = 'O'
+        poll_question1.save()
+
+        self.assertTrue(poll_question1.is_open_ended())
 
         self.uganda.set_config("state_label", "LGA")
         self.uganda.set_config("district_label", "District")
@@ -1050,9 +1058,6 @@ class PollQuestionTest(DashTest):
 
         with patch('ureport.polls.models.PollQuestion.get_results') as mock:
             mock.return_value = fetched_results
-
-            self.assertFalse(poll_question1.is_open_ended())
-            mock.assert_called_with()
 
             self.assertEquals(poll_question1.get_responded(), 3462)
             mock.assert_called_with()
