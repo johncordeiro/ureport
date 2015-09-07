@@ -105,6 +105,15 @@ class Contact(models.Model):
     district = models.CharField(max_length=255, verbose_name=_("District Field"), null=True)
 
     @classmethod
+    def get_or_create(cls, org, uuid):
+        contact = cls.objects.filter(org=org, uuid=uuid).first()
+
+        if not contact:
+            contact = cls.objects.create(org=org, uuid=uuid)
+
+        return contact
+
+    @classmethod
     def find_contact_field_key(cls, org, label):
         contact_field = ContactField.objects.filter(org=org, label__iexact=label).first()
         if contact_field:

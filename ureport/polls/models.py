@@ -13,6 +13,8 @@ from django.conf import settings
 
 
 # cache whether a question is open ended for a month
+from ureport.contacts.models import Contact
+
 OPEN_ENDED_CACHE_TIME = getattr(settings, 'OPEN_ENDED_CACHE_TIME', 60 * 60 * 24 * 30)
 
 # cache our featured polls for a month (this will be invalidated by questions changing)
@@ -376,3 +378,64 @@ class PollQuestion(SmartModel):
 
     def __unicode__(self):
         return self.title
+
+
+class PollResult(models.Model):
+
+    org = models.ForeignKey(Org, related_name="poll_results")
+
+    flow = models.CharField(max_length=36)
+
+    ruleset = models.CharField(max_length=36)
+
+    contact = models.CharField(max_length=36)
+
+    completed = models.BooleanField()
+
+    category = models.CharField(max_length=255)
+
+    text = models.CharField(max_length=640)
+
+    state = models.CharField(max_length=255, null=True)
+
+    district = models.CharField(max_length=255, null=True)
+
+    @classmethod
+    def kwargs_from_temba(cls, org, run_data, value_data):
+        contact = Contact.get_or_create(org, run_data.contact)
+
+        return dict(org=org, flow=run_data.flow, contact=run_data.contact, completed=run_data.completed,
+                    ruleset=value_data.node, category=value_data.category, text=value_data.text,
+                    state=contact.state, district=contact.district)
+
+    @classmethod
+    def update_or_create_from_temba(cls, org, run_data, value_data):
+        kwargs = cls.kwargs_from_temba(org, run_data, value_data)
+
+        existing = cls.objects.filter(org=org, flow=kwargs['flow'], ruleset=kwargs['ruleset'],
+                                      contact=kwargs['contact'])
+
+        if existing:
+            existing.update(**kwargs)
+            return existing.first()
+        else:
+            return cls.objects.create(**kwargs)
+
+    @classmethod
+    def fetch_poll_results(cls, org):
+
+        reporter_group = org.get_config('reporter_group')
+
+        temba_client = org.get_temba_client()
+        api_groups = temba_client.get_groups(name=reporter_group)
+
+        import pdb; pdb.set_trace()
+        groups = [str(api_groups[0].uuid)] if api_groups else None
+
+        flows = org.polls.all().values_list('flow_uuid', flat=True)
+        flows = [str(k) for k in flows]
+
+        api_runs = temba_client.get_runs(flows=flows, groups=groups)
+        for run_data in api_runs:
+            for value_data in run_data.values:
+                cls.update_or_create_from_temba(org, run_data, value_data)
