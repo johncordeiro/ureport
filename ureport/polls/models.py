@@ -439,3 +439,15 @@ class PollResult(models.Model):
         for run_data in api_runs:
             for value_data in run_data.values:
                 cls.update_or_create_from_temba(org, run_data, value_data)
+
+
+class PollResultsCounter(models.Model):
+
+    org = models.ForeignKey(Org, related_name='results_counters')
+
+    ruleset = models.CharField(max_length=36)
+
+    type = models.CharField(max_length=255)
+
+    count = models.IntegerField(default=0, help_text=_("Number of items with this counter"))
+
