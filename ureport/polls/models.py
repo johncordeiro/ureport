@@ -429,7 +429,6 @@ class PollResult(models.Model):
         temba_client = org.get_temba_client()
         api_groups = temba_client.get_groups(name=reporter_group)
 
-        import pdb; pdb.set_trace()
         groups = [str(api_groups[0].uuid)] if api_groups else None
 
         flows = org.polls.all().values_list('flow_uuid', flat=True)

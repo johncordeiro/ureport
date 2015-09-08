@@ -123,4 +123,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+      migrations.RunSQL(TRIGGER_SQL)
     ]
