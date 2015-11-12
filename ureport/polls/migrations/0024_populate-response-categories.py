@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
-import json
 import time
 from django.conf import settings
 
@@ -53,7 +52,7 @@ class Migration(migrations.Migration):
                         print "Created ruleset - %s" % ruleset_uuid
 
                     for rule in ruleset['rules']:
-                        category = json.dumps(rule['category'])
+                        category = rule['category'][flow_definition['base_language']]
                         existing_response_category = PollResponseCategory.objects.filter(question=poll_question,
                                                                                          rule_uuid=rule['uuid'])
                         if existing_response_category:

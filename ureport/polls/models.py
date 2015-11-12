@@ -167,7 +167,7 @@ class Poll(SmartModel):
 
             rapidpro_rules = []
             for rule in ruleset['rules']:
-                category = json.dumps(rule['category'])
+                category = rule['category'][flow_definition['base_language']]
                 rule_uuid = rule['uuid']
                 rapidpro_rules.append(rule_uuid)
 
@@ -472,27 +472,42 @@ class PollResult(models.Model):
 
     completed = models.BooleanField()
 
-    category = models.CharField(max_length=255)
+    category = models.CharField(max_length=255, null=True)
 
-    text = models.CharField(max_length=640)
+    text = models.CharField(max_length=640, null=True)
 
     state = models.CharField(max_length=255, null=True)
 
     district = models.CharField(max_length=255, null=True)
 
     @classmethod
-    def kwargs_from_temba(cls, org, run_data, value_data):
+    def kwargs_from_temba(cls, org, run_data, ruleset, value_data):
         from ureport.contacts.models import Contact
 
         contact = Contact.get_or_create(org, run_data.contact)
 
+        category = None
+        text = None
+        if value_data:
+            try:
+                category = value_data.category['base']
+            except KeyError:
+                pass
+
+            if not category:
+                try:
+                    category = value_data.category['eng']
+                except KeyError:
+                    pass
+
+            text = value_data.text
+
         return dict(org=org, flow=run_data.flow, contact=run_data.contact, completed=run_data.completed,
-                    ruleset=value_data.node, category=value_data.category, text=value_data.text,
-                    state=contact.state, district=contact.district)
+                    ruleset=ruleset, category=category, text=text, state=contact.state, district=contact.district)
 
     @classmethod
-    def update_or_create_from_temba(cls, org, run_data, value_data):
-        kwargs = cls.kwargs_from_temba(org, run_data, value_data)
+    def update_or_create_from_temba(cls, org, run_data, ruleset, value_data=None):
+        kwargs = cls.kwargs_from_temba(org, run_data, ruleset, value_data)
 
         existing = cls.objects.filter(org=org, flow=kwargs['flow'], ruleset=kwargs['ruleset'],
                                       contact=kwargs['contact'])
@@ -518,8 +533,14 @@ class PollResult(models.Model):
 
         api_runs = temba_client.get_runs(flows=flows, groups=groups)
         for run_data in api_runs:
+            for step in run_data.steps:
+                if step.type == 'R' and not step.text:
+                    ruleset = step.node
+                    cls.update_or_create_from_temba(org, run_data, ruleset)
+
             for value_data in run_data.values:
-                cls.update_or_create_from_temba(org, run_data, value_data)
+                ruleset = value_data.node
+                cls.update_or_create_from_temba(org, run_data, ruleset, value_data)
 
 
 class PollResultsCounter(models.Model):

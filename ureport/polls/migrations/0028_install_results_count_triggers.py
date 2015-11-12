@@ -48,13 +48,31 @@ BEGIN
     _count = -1;
   END IF;
   -- If we have an org, ruleset and category, increment the counters
-  IF _poll_result.org_id IS NOT NULL AND _poll_result.ruleset IS NOT NULL AND _poll_result.category iS NOT NULL THEN
-    PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category)), _count);
-    IF _poll_result.state IS NOT NULL THEN
-      PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category), ':state:', UPPER(_poll_result.state)), _count);
+  IF _poll_result.org_id IS NOT NULL AND _poll_resul.flow IS NOT NULL THEN
+    PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('poll:', LOWER(_poll_result.flow)), _count);
+
+    IF _poll_result.completed IS TRUE THEN
+      PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('completed-poll:', LOWER(_poll_result.flow)), _count);
     END IF;
-    IF _poll_result.district IS NOT NULL THEN
+
+    IF _poll_result.ruleset IS NOT NULL THEN
+      PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('ruleset:', LOWER(_poll_result.ruleset)), _count);
+
+      IF _poll_result.category iS NOT NULL THEN
+        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category)), _count);
+      END IF;
+
+      IF _poll_result.state IS NOT NULL AND _poll_result.category IS NOT NULL THEN
+        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category), ':state:', UPPER(_poll_result.state)), _count);
+      ELSIF _poll_result.state IS NOT NULL THEN
+        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', '', ':state:', UPPER(_poll_result.state)), _count);
+      END IF;
+
+      IF _poll_result.district IS NOT NULL AND _poll_result.category IS NOT NULL THEN
         PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category), ':district:', UPPER(_poll_result.district)), _count);
+      ELSIF _poll_result.district IS NOT NULL THEN
+        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', '', ':district:', UPPER(_poll_result.district)), _count);
+      END IF;
     END IF;
   END IF;
 END;
