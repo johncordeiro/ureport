@@ -88,7 +88,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS ureport_when_poll_result_update_then_update_results_counters on polls_pollresult;
 CREATE TRIGGER ureport_when_poll_result_update_then_update_results_counters
-  AFTER INSERT OR DELETE OR UPDATE ON polls_pollresult;
+  AFTER INSERT OR DELETE OR UPDATE ON polls_pollresult
   FOR EACH ROW EXECUTE PROCEDURE ureport_update_results_counters();
 
 DROP TRIGGER IF EXISTS ureport_when_poll_results_truncate_then_update_results_counters ON polls_pollresult;
