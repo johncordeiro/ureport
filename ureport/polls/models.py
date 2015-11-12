@@ -14,8 +14,6 @@ from django.conf import settings
 
 
 # cache whether a question is open ended for a month
-from ureport.contacts.models import Contact
-
 OPEN_ENDED_CACHE_TIME = getattr(settings, 'OPEN_ENDED_CACHE_TIME', 60 * 60 * 24 * 30)
 
 # cache our featured polls for a month (this will be invalidated by questions changing)
@@ -484,6 +482,8 @@ class PollResult(models.Model):
 
     @classmethod
     def kwargs_from_temba(cls, org, run_data, value_data):
+        from ureport.contacts.models import Contact
+
         contact = Contact.get_or_create(org, run_data.contact)
 
         return dict(org=org, flow=run_data.flow, contact=run_data.contact, completed=run_data.completed,
@@ -521,3 +521,13 @@ class PollResult(models.Model):
             for value_data in run_data.values:
                 cls.update_or_create_from_temba(org, run_data, value_data)
 
+
+class PollResultsCounter(models.Model):
+
+    org = models.ForeignKey(Org, related_name='results_counters')
+
+    ruleset = models.CharField(max_length=36)
+
+    type = models.CharField(max_length=255)
+
+    count = models.IntegerField(default=0, help_text=_("Number of items with this counter"))
