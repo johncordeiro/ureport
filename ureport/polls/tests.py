@@ -1164,7 +1164,7 @@ class PollResultsTest(DashTest):
                     mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
                                                               steps=[], values=[], completed=True)]
 
-                    seen_runs = PollResult.fetch_poll_results(self.nigeria)
+                    seen_runs = PollResult.fetch_poll_results(poll)
 
                     self.assertEqual(seen_runs, [])
 
@@ -1174,7 +1174,7 @@ class PollResultsTest(DashTest):
                                                                                       value=None, type='A')],
                                                               values=[], completed=True)]
 
-                    seen_runs = PollResult.fetch_poll_results(self.nigeria)
+                    seen_runs = PollResult.fetch_poll_results(poll)
 
                     self.assertEqual(seen_runs, [])
 
@@ -1183,7 +1183,7 @@ class PollResultsTest(DashTest):
                                                               steps=[TembaStep.create(node='step-uuid', text='allo',
                                                                                       value=None, type='R')],
                                                               values=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(self.nigeria)
+                    seen_runs = PollResult.fetch_poll_results(poll)
 
                     self.assertEqual(seen_runs, [])
 
@@ -1192,7 +1192,7 @@ class PollResultsTest(DashTest):
                                                               steps=[TembaStep.create(node='step-uuid', text=None,
                                                                                       value=None, type='R')],
                                                               values=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(self.nigeria)
+                    seen_runs = PollResult.fetch_poll_results(poll)
 
                     self.assertEqual(seen_runs, [100])
                     self.assertTrue(PollResult.objects.filter(ruleset='step-uuid').first())
@@ -1207,7 +1207,7 @@ class PollResultsTest(DashTest):
                                                                                                         base='Yego'),
                                                                                           text='Yeah')],
                                                               steps=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(self.nigeria)
+                    seen_runs = PollResult.fetch_poll_results(poll)
 
                     self.assertEqual(seen_runs, [100])
                     poll_result = PollResult.objects.filter(ruleset='step-uuid').first()
@@ -1215,7 +1215,7 @@ class PollResultsTest(DashTest):
                     self.assertEqual(poll_result.category, 'Yes')
 
                     # use base language if no poll language
-                    Poll.objects.create(org=self.nigeria, title='Poll 2', flow_uuid='flow-uuid-2',
+                    poll2 = Poll.objects.create(org=self.nigeria, title='Poll 2', flow_uuid='flow-uuid-2',
                                         category=self.education_nigeria, created_by=self.admin, modified_by=self.admin)
 
                     mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid-2', contact='contact-uuid',
@@ -1225,7 +1225,7 @@ class PollResultsTest(DashTest):
                                                                                                         base='Yego'),
                                                                                           text='Yeah')],
                                                               steps=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(self.nigeria)
+                    seen_runs = PollResult.fetch_poll_results(poll2)
 
                     self.assertEqual(seen_runs, [100])
                     poll_result = PollResult.objects.filter(ruleset='step-uuid-2').first()

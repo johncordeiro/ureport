@@ -467,7 +467,7 @@ class PollResponseCategory(models.Model):
 
 class PollResult(models.Model):
 
-    POLL_RESULTS_LAST_FETCHED_CACHE_KEY = 'last:fetch_poll_results:%d'
+    POLL_RESULTS_LAST_FETCHED_CACHE_KEY = 'last:fetch_poll_results:org:%d:poll:%d'
     POLL_RESULTS_LAST_FETCHED_CACHE_TIMEOUT = 60 * 60 * 24
 
     org = models.ForeignKey(Org, related_name="poll_results")
@@ -517,20 +517,17 @@ class PollResult(models.Model):
             return cls.objects.create(**kwargs)
 
     @classmethod
-    def fetch_poll_results(cls, org, after=None):
+    def fetch_poll_results(cls, poll, after=None):
         from ureport.utils import json_date_to_datetime, datetime_to_json_date
 
-        reporter_group = org.get_config('reporter_group')
+        org = poll.org
+
+        if not org:
+            return
 
         temba_client = org.get_temba_client()
-        api_groups = temba_client.get_groups(name=reporter_group)
 
-        groups = [str(api_groups[0].uuid)] if api_groups else None
-
-        org_polls = org.polls.all().values('flow_uuid', 'base_language')
-        flows = [str(poll['flow_uuid']) for poll in org_polls if poll['flow_uuid']]
-
-        flows_language = {poll['flow_uuid']: poll['base_language'] for poll in org_polls if poll['flow_uuid'] and poll['base_language']}
+        base_language = poll.base_language
 
         now = timezone.now().replace(tzinfo=pytz.utc)
         before = now
@@ -544,9 +541,8 @@ class PollResult(models.Model):
         while before > after:
             pager = temba_client.pager()
 
-            api_runs = temba_client.get_runs(flows=flows, groups=groups, befoer=before, after=after, pager=pager)
+            api_runs = temba_client.get_runs(flows=[poll.flow_uuid], befoer=before, after=after, pager=pager)
             for temba_run in api_runs:
-                base_language = flows_language.get(temba_run.flow, 'base')
                 for temba_step in temba_run.steps:
                     if temba_step.type == 'R' and not temba_step.text:
                         ruleset = temba_step.node
@@ -561,12 +557,13 @@ class PollResult(models.Model):
                         seen_runs.append(temba_run.id)
 
             if not pager.has_more():
-                cache.set(cls.POLL_RESULTS_LAST_FETCHED_CACHE_KEY % org.pk,
+                cache.set(cls.POLL_RESULTS_LAST_FETCHED_CACHE_KEY % (org.pk, poll.pk),
                           datetime_to_json_date(now.replace(tzinfo=pytz.utc)),
                           cls.POLL_RESULTS_LAST_FETCHED_CACHE_TIMEOUT)
                 break
 
         return seen_runs
+
 
 class PollResultsCounter(models.Model):
 
