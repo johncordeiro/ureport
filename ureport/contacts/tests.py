@@ -189,8 +189,8 @@ class ContactTest(DashTest):
 
                 with patch('dash.orgs.models.TembaClient.get_contacts') as mock_contacts:
                     mock_contacts.return_value = [
-                        TembaContact.create(uuid='000-001', name="Ann",urns=['tel:1234'], groups=['000-002'],
-                                            fields=dict(state="Lagos", lga="Oyo",gender='Female', born="1990"),
+                        TembaContact.create(uuid='000-001', name="Ann", urns=['tel:1234'], groups=['000-002'],
+                                            fields=dict(state="Lagos", lga="Oyo", gender='Female', born="1990"),
                                             language='eng',
                                             modified_on=datetime(2015, 9, 20, 10, 20, 30, 400000, pytz.utc))]
 

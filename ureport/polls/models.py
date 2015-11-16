@@ -3,7 +3,9 @@ import json
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
+import pytz
 from smartmin.models import SmartModel
 from django.utils.translation import ugettext_lazy as _
 from django.core.cache import cache
@@ -465,6 +467,9 @@ class PollResponseCategory(models.Model):
 
 class PollResult(models.Model):
 
+    POLL_RESULTS_LAST_FETCHED_CACHE_KEY = 'last:fetch_poll_results:%d'
+    POLL_RESULTS_LAST_FETCHED_CACHE_TIMEOUT = 60 * 60 * 24
+
     org = models.ForeignKey(Org, related_name="poll_results")
 
     flow = models.CharField(max_length=36)
@@ -483,6 +488,85 @@ class PollResult(models.Model):
 
     district = models.CharField(max_length=255, null=True)
 
+    @classmethod
+    def kwargs_from_temba(cls, org, ruleset, base_language, temba_run, temba_value):
+        from ureport.contacts.models import Contact
+
+        contact = Contact.get_or_create(org, temba_run.contact)
+
+        category = None
+        text = None
+        if temba_value:
+            category = temba_value.category.get(base_language, None)
+            text = temba_value.text
+
+        return dict(org=org, flow=temba_run.flow, contact=temba_run.contact, completed=temba_run.completed,
+                    ruleset=ruleset, category=category, text=text, state=contact.state, district=contact.district)
+
+    @classmethod
+    def update_or_create_from_temba(cls, org, ruleset, base_language, temba_run, temba_value=None):
+        kwargs = cls.kwargs_from_temba(org, ruleset, base_language, temba_run, temba_value)
+
+        existing = cls.objects.filter(org=org, flow=kwargs['flow'], ruleset=kwargs['ruleset'],
+                                      contact=kwargs['contact'])
+
+        if existing:
+            existing.update(**kwargs)
+            return existing.first()
+        else:
+            return cls.objects.create(**kwargs)
+
+    @classmethod
+    def fetch_poll_results(cls, org, after=None):
+        from ureport.utils import json_date_to_datetime, datetime_to_json_date
+
+        reporter_group = org.get_config('reporter_group')
+
+        temba_client = org.get_temba_client()
+        api_groups = temba_client.get_groups(name=reporter_group)
+
+        groups = [str(api_groups[0].uuid)] if api_groups else None
+
+        org_polls = org.polls.all().values('flow_uuid', 'base_language')
+        flows = [str(poll['flow_uuid']) for poll in org_polls if poll['flow_uuid']]
+
+        flows_language = {poll['flow_uuid']: poll['base_language'] for poll in org_polls if poll['flow_uuid'] and poll['base_language']}
+
+        now = timezone.now().replace(tzinfo=pytz.utc)
+        before = now
+
+        seen_runs = []
+
+        if not after:
+            # consider the after year 2013
+            after = json_date_to_datetime("2013-01-01T00:00:00.000")
+
+        while before > after:
+            pager = temba_client.pager()
+
+            api_runs = temba_client.get_runs(flows=flows, groups=groups, befoer=before, after=after, pager=pager)
+            for temba_run in api_runs:
+                base_language = flows_language.get(temba_run.flow, 'base')
+                for temba_step in temba_run.steps:
+                    if temba_step.type == 'R' and not temba_step.text:
+                        ruleset = temba_step.node
+                        cls.update_or_create_from_temba(org, ruleset, base_language, temba_run)
+                        if temba_run.id not in seen_runs:
+                            seen_runs.append(temba_run.id)
+
+                for temba_value in temba_run.values:
+                    ruleset = temba_value.node
+                    cls.update_or_create_from_temba(org, ruleset, base_language, temba_run, temba_value)
+                    if temba_run.id not in seen_runs:
+                        seen_runs.append(temba_run.id)
+
+            if not pager.has_more():
+                cache.set(cls.POLL_RESULTS_LAST_FETCHED_CACHE_KEY % org.pk,
+                          datetime_to_json_date(now.replace(tzinfo=pytz.utc)),
+                          cls.POLL_RESULTS_LAST_FETCHED_CACHE_TIMEOUT)
+                break
+
+        return seen_runs
 
 class PollResultsCounter(models.Model):
 

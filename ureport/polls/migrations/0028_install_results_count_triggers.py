@@ -47,7 +47,7 @@ BEGIN
     _count = -1;
   END IF;
   -- Count only if we have an org and a flow
-  IF _poll_result.org_id IS NOT NULL AND _poll_resul.flow IS NOT NULL THEN
+  IF _poll_result.org_id IS NOT NULL AND _poll_result.flow IS NOT NULL THEN
 
     -- The number of polled contacts; the contacts added to the flow
     PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('flow:', LOWER(_poll_result.flow)), _count);
