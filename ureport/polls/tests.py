@@ -16,7 +16,8 @@ import pytz
 from temba_client.client import Result, Flow, Group as TembaGroup, Run as TembaRun
 from temba_client.types import RunValueSet, FlowStep as TembaStep
 from ureport.contacts.models import Contact
-from ureport.polls.models import Poll, PollQuestion, FeaturedResponse, PollImage, CACHE_POLL_RESULTS_KEY, PollResult
+from ureport.polls.models import Poll, PollQuestion, FeaturedResponse, PollImage, CACHE_POLL_RESULTS_KEY, PollResult, \
+    PollResultsCounter
 from ureport.polls.models import UREPORT_ASYNC_FETCHED_DATA_CACHE_TIME
 from ureport.polls.tasks import refresh_main_poll, refresh_brick_polls, refresh_other_polls, refresh_org_flows
 from ureport.polls.tasks import fetch_poll, fetch_old_sites_count
@@ -1111,6 +1112,13 @@ class PollResultsTest(DashTest):
                                                          name="Education",
                                                          created_by=self.admin,
                                                          modified_by=self.admin)
+
+        self.poll = Poll.objects.create(org=self.nigeria, base_language='eng', title='Poll 1', flow_uuid='flow-uuid',
+                                        category=self.education_nigeria, created_by=self.admin, modified_by=self.admin)
+
+        self.poll_question = PollQuestion.objects.create(poll= self.poll, title='question 1', ruleset_uuid='step-uuid',
+                                                         created_by=self.admin, modified_by=self.admin)
+
     def test_kwargs_from_temba(self):
         temba_run = TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid', steps=[], values=[],
                                     completed=True)
@@ -1148,86 +1156,130 @@ class PollResultsTest(DashTest):
 
     def test_fetch_poll_results(self):
         self.nigeria.set_config('reporter_group', 'Reporters')
-        poll = Poll.objects.create(org=self.nigeria, base_language='eng', title='Poll 1', flow_uuid='flow-uuid',
-                                   category=self.education_nigeria, created_by=self.admin, modified_by=self.admin)
 
         tz = pytz.timezone('UTC')
         with patch.object(timezone, 'now', return_value=tz.localize(datetime(2015, 9, 29, 10, 20, 30, 40))):
 
-            with patch('dash.orgs.models.TembaClient.get_groups') as mock_groups:
-                group = TembaGroup.create(uuid="uuid-8", name='reporters', size=120)
-                mock_groups.return_value = [group]
+            with patch('dash.orgs.models.TembaClient.get_runs') as mock_runs:
 
-                with patch('dash.orgs.models.TembaClient.get_runs') as mock_runs:
-
-                    # no steps and values
-                    mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
+                # no steps and values
+                mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
                                                               steps=[], values=[], completed=True)]
 
-                    seen_runs = PollResult.fetch_poll_results(poll)
+                seen_runs = PollResult.fetch_poll_results(self.poll)
 
-                    self.assertEqual(seen_runs, [])
+                self.assertEqual(seen_runs, [])
 
-                    # Ignore step that aren't rulesets
-                    mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
+                # Ignore step that aren't rulesets
+                mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
                                                               steps=[TembaStep.create(node='step-uuid', text=None,
                                                                                       value=None, type='A')],
                                                               values=[], completed=True)]
 
-                    seen_runs = PollResult.fetch_poll_results(poll)
+                seen_runs = PollResult.fetch_poll_results(self.poll)
 
-                    self.assertEqual(seen_runs, [])
+                self.assertEqual(seen_runs, [])
 
-                    # Ignore rulesets steps if they got response text; we'll get these from values field
-                    mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
+                # Ignore rulesets steps if they got response text; we'll get these from values field
+                mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
                                                               steps=[TembaStep.create(node='step-uuid', text='allo',
                                                                                       value=None, type='R')],
                                                               values=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(poll)
+                seen_runs = PollResult.fetch_poll_results(self.poll)
 
-                    self.assertEqual(seen_runs, [])
+                self.assertEqual(seen_runs, [])
 
-                    # ruleset steps missing response text, should create a poll result with empty values
-                    mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
+                # ruleset steps missing response text, should create a poll result with empty values
+                mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
                                                               steps=[TembaStep.create(node='step-uuid', text=None,
                                                                                       value=None, type='R')],
                                                               values=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(poll)
+                seen_runs = PollResult.fetch_poll_results(self.poll)
 
-                    self.assertEqual(seen_runs, [100])
-                    self.assertTrue(PollResult.objects.filter(ruleset='step-uuid').first())
+                self.assertEqual(seen_runs, [100])
+                self.assertTrue(PollResult.objects.filter(ruleset='step-uuid').first())
 
-                    PollResult.objects.all().delete()
+                PollResult.objects.all().delete()
 
-                    # all values should be considered
-                    mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
+                # all values should be considered
+                mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid', contact='contact-uuid',
                                                               values=[RunValueSet.create(node='step-uuid',
                                                                                           category=dict(eng='Yes',
                                                                                                         fre='Oui',
                                                                                                         base='Yego'),
                                                                                           text='Yeah')],
                                                               steps=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(poll)
+                seen_runs = PollResult.fetch_poll_results(self.poll)
 
-                    self.assertEqual(seen_runs, [100])
-                    poll_result = PollResult.objects.filter(ruleset='step-uuid').first()
-                    self.assertEqual(poll_result.text, 'Yeah')
-                    self.assertEqual(poll_result.category, 'Yes')
+                self.assertEqual(seen_runs, [100])
+                poll_result = PollResult.objects.filter(ruleset='step-uuid').first()
+                self.assertEqual(poll_result.text, 'Yeah')
+                self.assertEqual(poll_result.category, 'Yes')
 
-                    # use base language if no poll language
-                    poll2 = Poll.objects.create(org=self.nigeria, title='Poll 2', flow_uuid='flow-uuid-2',
+                # use base language if no poll language
+                poll2 = Poll.objects.create(org=self.nigeria, title='Poll 2', flow_uuid='flow-uuid-2',
                                         category=self.education_nigeria, created_by=self.admin, modified_by=self.admin)
 
-                    mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid-2', contact='contact-uuid',
+                mock_runs.return_value = [TembaRun.create(id=100, flow='flow-uuid-2', contact='contact-uuid',
                                                               values=[RunValueSet.create(node='step-uuid-2',
                                                                                           category=dict(eng='Yes',
                                                                                                         fre='Oui',
                                                                                                         base='Yego'),
                                                                                           text='Yeah')],
                                                               steps=[], completed=True)]
-                    seen_runs = PollResult.fetch_poll_results(poll2)
+                seen_runs = PollResult.fetch_poll_results(poll2)
 
-                    self.assertEqual(seen_runs, [100])
-                    poll_result = PollResult.objects.filter(ruleset='step-uuid-2').first()
-                    self.assertEqual(poll_result.text, 'Yeah')
-                    self.assertEqual(poll_result.category, 'Yego')
+                self.assertEqual(seen_runs, [100])
+                poll_result = PollResult.objects.filter(ruleset='step-uuid-2').first()
+                self.assertEqual(poll_result.text, 'Yeah')
+                self.assertEqual(poll_result.category, 'Yego')
+
+    def test_poll_results_counters(self):
+        self.assertEqual(PollResultsCounter.get_poll_results(self.poll), dict())
+
+        poll_result = PollResult.objects.create(org=self.nigeria, flow=self.poll.flow_uuid, ruleset=self.poll_question.ruleset_uuid,
+                                  contact='contact-uuid', completed=False)
+
+        expected = dict()
+        expected["flow:%s" % self.poll.flow_uuid] = 1
+        expected["ruleset:%s" % self.poll_question.ruleset_uuid] = 1
+
+        self.assertEqual(PollResultsCounter.get_poll_results(self.poll), expected)
+
+        poll_result.completed = True
+        poll_result.save()
+
+        expected["completed:%s" % self.poll.flow_uuid] = 1
+        self.assertEqual(PollResultsCounter.get_poll_results(self.poll), expected)
+
+        poll_result.state = 'R-LAGOS'
+        poll_result.save()
+
+        expected['nocategory:state:R-LAGOS'] = 1
+        self.assertEqual(PollResultsCounter.get_poll_results(self.poll), expected)
+
+        poll_result.category = 'Yes'
+        poll_result.save()
+
+        expected['category:yes:state:R-LAGOS'] = 1
+        expected['nocategory:state:R-LAGOS'] = 0
+        expected["category:yes"] = 1
+
+        self.assertEqual(PollResultsCounter.get_poll_results(self.poll), expected)
+
+        PollResult.objects.create(org=self.nigeria, flow=self.poll.flow_uuid, ruleset=self.poll_question.ruleset_uuid,
+                                  contact='contact-uuid', completed=False, category='No', text='Nah', state='R-LAGOS',
+                                  district='R-oyo')
+
+        expected = dict()
+        expected["flow:%s" % self.poll.flow_uuid] = 2
+        expected["ruleset:%s" % self.poll_question.ruleset_uuid] = 2
+        expected["completed:%s" % self.poll.flow_uuid] = 1
+        expected["category:yes"] = 1
+        expected["category:no"] = 1
+        expected['nocategory:state:R-LAGOS'] = 0
+        expected['category:yes:state:R-LAGOS'] = 1
+        expected['category:no:state:R-LAGOS'] = 1
+        expected['category:no:district:R-OYO'] = 1
+
+        self.assertEqual(PollResultsCounter.get_poll_results(self.poll), expected)

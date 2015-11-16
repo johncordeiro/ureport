@@ -72,7 +72,7 @@ BEGIN
         PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category), ':state:', UPPER(_poll_result.state)), _count);
       ELSIF _poll_result.state IS NOT NULL THEN
         -- Maps counts without replies; contacts from this state who did not reply
-        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('nocategory:', ':state:', UPPER(_poll_result.state)), _count);
+        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('nocategory', ':state:', UPPER(_poll_result.state)), _count);
       END IF;
 
       IF _poll_result.district IS NOT NULL AND _poll_result.category IS NOT NULL THEN
@@ -80,7 +80,7 @@ BEGIN
         PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('category:', LOWER(_poll_result.category), ':district:', UPPER(_poll_result.district)), _count);
       ELSIF _poll_result.district IS NOT NULL THEN
         -- Maps counts without replies; contacts from this district who did not reply
-        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('nocategory:', ':district:', UPPER(_poll_result.district)), _count);
+        PERFORM ureport_insert_results_counter(_poll_result.org_id, _poll_result.ruleset, CONCAT('nocategory', ':district:', UPPER(_poll_result.district)), _count);
       END IF;
 
     END IF;
