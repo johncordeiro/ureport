@@ -56,7 +56,6 @@ def refresh_brick_polls(org_id=None):
             for org in active_orgs:
                 fetch_brick_polls_results(org)
 
-
             print "Task: Update_brick_polls took %ss" % (time.time() - start)
 
 

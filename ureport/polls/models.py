@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import json
+import time
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.db import models
@@ -539,11 +540,19 @@ class PollResult(models.Model):
             # consider the after year 2013
             after = json_date_to_datetime("2013-01-01T00:00:00.000")
 
+        start = time.time()
+
         while before > after:
             pager = temba_client.pager()
 
-            api_runs = temba_client.get_runs(flows=[poll.flow_uuid], befoer=before, after=after, pager=pager)
-            for temba_run in api_runs:
+            api_runs = temba_client.get_runs(flows=[poll.flow_uuid], before=before, after=after, pager=pager)
+
+            last_run_index = len(api_runs) - 1
+
+            for idx, temba_run in enumerate(api_runs):
+                if idx == last_run_index:
+                    before = temba_run.modified_on
+
                 for temba_step in temba_run.steps:
                     if temba_step.type == 'R' and not temba_step.text:
                         ruleset = temba_step.node
@@ -563,6 +572,7 @@ class PollResult(models.Model):
                           cls.POLL_RESULTS_LAST_FETCHED_CACHE_TIMEOUT)
                 break
 
+        print "Finished fetching run for %s in %ss" % (poll.title, time.time() - start)
         return seen_runs
 
 
