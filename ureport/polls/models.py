@@ -543,6 +543,7 @@ class PollResult(models.Model):
         start = time.time()
 
         while before > after:
+            print 'fetching results first page before %s' % before
             pager = temba_client.pager()
 
             api_runs = temba_client.get_runs(flows=[poll.flow_uuid], before=before, after=after, pager=pager)
@@ -571,6 +572,7 @@ class PollResult(models.Model):
                           datetime_to_json_date(now.replace(tzinfo=pytz.utc)),
                           cls.POLL_RESULTS_LAST_FETCHED_CACHE_TIMEOUT)
                 break
+            print "Fetch took %ss" % (time.time() - start)
 
         print "Finished fetching run for %s in %ss" % (poll.title, time.time() - start)
         return seen_runs
