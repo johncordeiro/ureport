@@ -44,7 +44,7 @@ psycopg2==2.6.1
 pycountry==1.12
 python-dateutil==2.4.2
 pytz==2015.7
--e git+https://github.com/rapidpro/rapidpro-python.git@87a294e6599a9a91671d8da34d281952d2c35dbd#egg=rapidpro-python-master
+rapidpro-python==1.6.2
 raven==5.3.1
 redis==2.10.3
 regex==2015.07.19
