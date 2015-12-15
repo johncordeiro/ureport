@@ -487,7 +487,13 @@ CELERYBEAT_SCHEDULE = {
         "task": "contacts.fetch_contacts_task",
         "schedule": timedelta(minutes=10),
         "relative": True,
-     },
+    },
+    "recheck_flow_archived": {
+         "task": "polls.recheck_flow_archived",
+        "schedule": timedelta(hours=24),
+        "relative": True,
+    },
+
 }
 
 #-----------------------------------------------------------------------------------
