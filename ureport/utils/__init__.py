@@ -110,7 +110,7 @@ def fetch_contact_field_results(org, contact_field, segment):
     from ureport.polls.models import UREPORT_RUN_FETCHED_DATA_CACHE_TIME
 
     start = time.time()
-    print "Fetching  %s for %s with segment %s" % (contact_field, org.name, segment)
+    #print "Fetching  %s for %s with segment %s" % (contact_field, org.name, segment)
 
     cache_time = UREPORT_ASYNC_FETCHED_DATA_CACHE_TIME
     if segment and segment.get('location', "") == "District":
@@ -264,13 +264,13 @@ def _fetch_org_polls_results(org, polls):
 
     for poll in polls:
         start = time.time()
-        print "Fetching polls results for poll id(%d) - %s" % (poll.pk, poll.title)
+        #print "Fetching polls results for poll id(%d) - %s" % (poll.pk, poll.title)
 
         key = LOCK_POLL_RESULTS_KEY % poll.pk
         if not r.get(key):
             with r.lock(key, timeout=LOCK_POLL_RESULTS_TIMEOUT):
                 poll.fetch_poll_results()
-                print "Fetch results for poll id(%d) on %s took %ss" % (poll.pk, org.name, time.time() - start)
+                #print "Fetch results for poll id(%d) on %s took %ss" % (poll.pk, org.name, time.time() - start)
 
 
 def fetch_main_poll_results(org):
@@ -291,7 +291,7 @@ def fetch_other_polls_results(org):
 
 def fetch_flows(org):
     start = time.time()
-    print "Fetching flows for %s" % org.name
+    #print "Fetching flows for %s" % org.name
 
     try:
         from ureport.polls.models import CACHE_ORG_FLOWS_KEY, UREPORT_ASYNC_FETCHED_DATA_CACHE_TIME
@@ -325,7 +325,7 @@ def fetch_flows(org):
         import traceback
         traceback.print_exc()
 
-    print "Fetch %s flows took %ss" % (org.name, time.time() - start)
+    #print "Fetch %s flows took %ss" % (org.name, time.time() - start)
 
 
 def get_flows(org):
