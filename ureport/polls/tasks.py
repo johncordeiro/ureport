@@ -4,7 +4,7 @@ from dash.orgs.models import Org
 from django_redis import get_redis_connection
 from djcelery.app import app
 from ureport.polls.models import Poll
-from ureport.utils import fetch_flows, fetch_old_sites_count
+from ureport.utils import fetch_flows, fetch_old_sites_count, update_poll_flow_archived
 from ureport.utils import fetch_main_poll_results, fetch_brick_polls_results, fetch_other_polls_results
 
 
@@ -127,39 +127,23 @@ def fetch_poll(poll_id):
         # get our poll
         from .models import Poll
         poll = Poll.objects.get(pk=poll_id)
+
+        # update poll flow_archived
+        update_poll_flow_archived(poll.org)
+
         poll.fetch_poll_results()
     except Exception as e:
         logger.exception("Error fetching poll results: %s" % str(e))
 
 
-@app.task(track_started=True, name='polls.recheck_flow_archived')
-def recheck_flow_archived(org_id=None):
+@app.task(track_started=True, name='polls.recheck_poll_flow_archived')
+def recheck_poll_flow_archived(org_id=None):
 
-    start = time.time()
-    r = get_redis_connection()
-
-    key = 'update_flow_archived'
-    lock_timeout = 900
-
+    active_orgs = Org.objects.filter(is_active=True)
     if org_id:
-        key = 'update_flow_archived:%d' % org_id
-        lock_timeout = 30
+        active_orgs = Org.objects.filter(pk=org_id)
 
-    if not r.get(key):
-        with r.lock(key, timeout=lock_timeout):
-            active_orgs = Org.objects.filter(is_active=True)
-            if org_id:
-                active_orgs = Org.objects.filter(pk=org_id)
+    for org in active_orgs:
+        update_poll_flow_archived(org)
 
-            for org in active_orgs:
-                temba_client = org.get_temba_client()
-                flows = temba_client.get_flows(archived=False)
-
-                not_archived_uuids = []
-                for flow in flows:
-                    not_archived_uuids.append(flow.uuid)
-
-                Poll.objects.exclude(flow_uuid__in=not_archived_uuids).update(flow_archived=True)
-                Poll.objects.filter(flow_uuid__in=not_archived_uuids).update(flow_archived=False)
-
-        print "Task: recheck_flow_archived took %ss" % (time.time() - start)
+    print "Task: recheck_poll_flow_archived done"
