@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 @app.task(name='contacts.fetch_contacts_task')
 def fetch_contacts_task(org_id=None, fetch_all=False):
-
     r = get_redis_connection()
 
     key = 'fetch_contacts'
@@ -46,7 +45,8 @@ def fetch_contacts_task(org_id=None, fetch_all=False):
                 try:
                     Boundary.get_boundaries(org)
                     ContactField.get_contact_fields(org)
-                    Contact.fetch_contacts(org, after=after)
+                    contacts = Contact.fetch_contacts(org, after=after)
+                    Contact.sync_contacts_removed(org, contacts)
 
                     print "Task: fetch_contacts for %s took %ss" % (org.name, time.time() - start)
 
@@ -54,5 +54,3 @@ def fetch_contacts_task(org_id=None, fetch_all=False):
                     import traceback
                     traceback.print_exc()
                     logger.exception("Error fetching contacts: %s" % str(e))
-
-
